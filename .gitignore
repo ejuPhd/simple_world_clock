@@ -1,0 +1,13 @@
+# Runtime data — changes every time the app runs.
+# Users generate their own on first load.
+data/clock.json
+
+# macOS housekeeping
+.DS_Store
+
+# Editor folders
+.vscode/
+.idea/
+
+# Composer dependencies (if added later)
+/vendor/

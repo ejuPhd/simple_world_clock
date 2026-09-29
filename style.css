@@ -1,0 +1,401 @@
+/* themes by mood
+---------------------------------------------------------------
+This file gives the clock its visual identity.
+The key idea: <body> (and each card) gets a class like "mood-day",
+"mood-night", etc. CSS variables are redefined per mood so colors
+change automatically.
+-------------------------------------------------------------- */
+
+/* Reset some defaults so our layout is predictable. */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+/* Base page styles and a smooth transition between moods. */
+body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    min-height: 100vh;
+    padding: 2rem;
+    transition: background 1.5s ease, color 1.5s ease;
+    color: var(--text);
+    background: var(--bg);
+}
+
+/* --------------------------------------------------------------
+MOOD THEMES
+We define CSS custom properties (variables) for each mood.
+Then all the components below use var(--bg) etc. and they
+automatically follow the mood set on <body>.
+----------------------------------------------------------------- */
+
+body.mood-night {
+    --bg: #0b1026;
+    /* Deep navy */
+    --text: #e6ebff;
+    /* Pale blue-white */
+    --card: #141a3a;
+    /* Slightly lighter navy */
+    --accent: #7c8cff;
+    /* Electric periwinkle */
+}
+
+body.mood-dawn {
+    --bg: #ffb59b;
+    /* Peach */
+    --text: #2c1a12;
+    --card: #ffd6c4;
+    --accent: #e0704c;
+}
+
+body.mood-day {
+    --bg: #cfe9ff;
+    /* Soft sky */
+    --text: #10243a;
+    --card: #ffffff;
+    --accent: #3a7bd5;
+}
+
+body.mood-dusk {
+    --bg: #3b2352;
+    /* Twilight purple */
+    --text: #f6ecff;
+    --card: #4d2e6c;
+    --accent: #ffb27a;
+}
+
+/* ----------------------------------------------------------------
+   HEADER — title block centered, action slot on the far right
+   ---------------------------------------------------------------- */
+.site-header {
+    /* Flex puts children side-by-side on one row. */
+    display: flex;
+
+    /* Center items vertically within the header. */
+    align-items: center;
+
+    /* Space them apart so the title sits center-ish and the
+       action sits hard right. */
+    justify-content: space-between;
+
+    /* Gap between title and action, in case they get close. */
+    gap: 1rem;
+
+    /* A little breathing room below the header. */
+    margin-bottom: 2rem;
+
+    /* position: relative makes this the anchor for anything
+       absolutely positioned inside it later (not needed now,
+       but a good habit for header bars). */
+    position: relative;
+}
+
+/* The title block can grow to fill the space between the
+   left edge and the action slot. text-align: center keeps the
+   text visually centered within that space. */
+.site-header .header-main {
+    flex: 1;
+    /* take all available width */
+    text-align: center;
+    /* center the title + subtitle */
+}
+
+.site-header h1 {
+    font-size: 2rem;
+    letter-spacing: 0.05em;
+}
+
+.subtitle {
+    opacity: 0.75;
+    margin-top: 0.25rem;
+}
+
+/* The right-hand action slot. Pinned to the right by
+   space-between above; also nudged up slightly so it aligns
+   with the h1 rather than the subtitle. */
+.site-header .header-action {
+    /* Prevent the button from shrinking when the title is long. */
+    flex-shrink: 0;
+
+    /* Small nudge so the gear sits flush with the top of the h1. */
+    align-self: flex-start;
+}
+
+/* Optional: make the header action a compact square icon button.
+   Use it by adding class="btn btn-icon" to the link. */
+.header-action .btn-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    padding: 0;
+    display: inline-flex;
+    /* flex lets us center the glyph */
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    border-radius: 50%;
+    /* round button */
+}
+
+/* ----------------------------------------------------------------
+   ALARM BANNER (shown only when an alarm is ringing)
+   ---------------------------------------------------------------- */
+.alarm-banner {
+    background: var(--accent);
+    color: #fff;
+    padding: 1rem 1.5rem;
+    border-radius: 12px;
+    margin-bottom: 1.5rem;
+    /* Pulsing animation draws the eye. */
+    animation: pulse 1.2s ease-in-out infinite;
+}
+
+.alarm-banner h2 {
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+
+    50% {
+        transform: scale(1.02);
+        opacity: 0.85;
+    }
+}
+
+/* ----------------------------------------------------------------
+   TIMEZONE GRID
+   ---------------------------------------------------------------- */
+.timezones {
+    display: grid;
+    /* Responsive columns: at least 220px, as many as fit. */
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.tz-card {
+    background: var(--card);
+    border-radius: 16px;
+    padding: 1.25rem;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    transition: transform 0.3s ease, background 1.5s ease;
+}
+
+.tz-card:hover {
+    transform: translateY(-3px);
+}
+
+.tz-card h2 {
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    opacity: 0.8;
+    margin-bottom: 0.5rem;
+}
+
+/* The big live time display. */
+.tz-card .clock {
+    font-size: 2rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    /* Prevents digits "jumping" */
+    margin: 0.25rem 0;
+}
+
+.tz-card .tz-id {
+    font-size: 0.75rem;
+    opacity: 0.6;
+}
+
+.tz-card .tz-mood {
+    font-size: 0.75rem;
+    margin-top: 0.5rem;
+    color: var(--accent);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+/* ----------------------------------------------------------------
+   ALARM LIST
+   ---------------------------------------------------------------- */
+.alarms h2 {
+    margin-bottom: 0.75rem;
+}
+
+.alarm-list {
+    list-style: none;
+    display: grid;
+    gap: 0.5rem;
+}
+
+.alarm {
+    display: grid;
+    /* name | time | timezone | status */
+    grid-template-columns: 2fr 1fr 2fr 1fr;
+    gap: 1rem;
+    padding: 0.75rem 1rem;
+    background: var(--card);
+    border-radius: 10px;
+    align-items: center;
+    font-size: 0.9rem;
+}
+
+/* Disabled alarms fade out but stay visible. */
+.alarm.disabled {
+    opacity: 0.45;
+}
+
+.alarm-time {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.alarm-tz {
+    font-size: 0.8rem;
+    opacity: 0.7;
+}
+
+.alarm-status {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    font-weight: 700;
+}
+
+/* ----------------------------------------------------------------
+   FOOTER
+   ---------------------------------------------------------------- */
+.site-footer {
+    margin-top: 3cm;
+    text-align: center;
+    font-size: 0.8rem;
+    opacity: 0.7;
+}
+
+/* ================================================================
+   SETTINGS PAGE & NEW UI ELEMENTS
+   ================================================================ */
+
+/* The "MAIN" badge on the first timezone card */
+.tz-card.main {
+    outline: 3px solid var(--accent);
+    outline-offset: -3px;
+}
+
+.badge {
+    font-size: 0.65rem;
+    background: var(--accent);
+    color: #fff;
+    padding: 0.15rem 0.4rem;
+    border-radius: 999px;
+    margin-left: 0.4rem;
+    vertical-align: middle;
+    letter-spacing: 0.1em;
+}
+
+/* Buttons */
+.btn,
+button {
+    background: var(--accent);
+    color: #fff;
+    border: 0;
+    padding: 0.5rem 0.9rem;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    text-decoration: none;
+    display: inline-block;
+}
+
+button.danger {
+    background: #c23b3b;
+}
+
+button:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+/* Notifications after a save */
+.notice {
+    background: var(--accent);
+    color: #fff;
+    padding: 0.6rem 1rem;
+    border-radius: 8px;
+    display: inline-block;
+    margin-top: 0.5rem;
+}
+
+/* Settings sections */
+.settings-section {
+    background: var(--card);
+    border-radius: 14px;
+    padding: 1.25rem;
+    margin-bottom: 1.25rem;
+}
+
+.settings-section h2 {
+    margin-bottom: 0.75rem;
+    font-size: 1.05rem;
+}
+
+/* Tables */
+.settings-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.settings-table th,
+.settings-table td {
+    padding: 0.5rem 0.6rem;
+    text-align: left;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    vertical-align: middle;
+}
+
+.settings-table tr.disabled-row {
+    opacity: 0.5;
+}
+
+/* Inline forms so buttons sit in a row */
+.inline {
+    display: inline-block;
+    margin-right: 0.25rem;
+}
+
+.row-form {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+/* Inputs */
+input[type="text"],
+input[type="time"],
+select {
+    background: rgba(255, 255, 255, 0.08);
+    color: inherit;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 6px;
+    padding: 0.4rem 0.55rem;
+    font-size: 0.9rem;
+}
+
+/* Footer */
+.site-footer {
+    margin-top: 3rem;
+    text-align: center;
+    font-size: 0.8rem;
+    opacity: 0.7;
+}
