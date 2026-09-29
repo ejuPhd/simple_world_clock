@@ -70,6 +70,24 @@ function moodForHour(int $hour): string
 }
 
 /**
+ * Format a time string according to the user's 12/24-hour choice.
+ *
+ * @param string $timezone  PHP timezone identifier
+ * @param string $format24  The 24-hour format, e.g. 'H:i:s'
+ * @param string $format12  The 12-hour format, e.g. 'g:i:s A'
+ * @param string $pref      Either '12' or '24'
+ * @return string           The formatted time
+ */
+function formatTime(string $timezone, string $format24, string $format12, string $pref): string
+{
+    // Pick which format string to use based on the preference.
+    $format = $pref === '12' ? $format12 : $format24;
+
+    // Delegate to timeInZone — we already wrote that.
+    return timeInZone($timezone, $format);
+}
+
+/**
  * Given the full list of alarms, find which alarm (if any) is
  * currently ringing.
  *
@@ -126,4 +144,40 @@ function isValidTime(string $time): bool
     // The regex: two digits, a colon, two digits.
     // ^ and $ anchor to the whole string so "12:345" fails.
     return (bool) preg_match('/^\d{2}:\d{2}$/', $time);
+}
+
+/**
+ * Return the full list of valid PHP timezone identifiers.
+ *
+ * DateTimeZone::listIdentifiers() returns every zone PHP knows
+ * about (about 400+). We fetch it once, cache it in a static
+ * variable so repeated calls in the same request are free, and
+ * return the list for use in a <select> dropdown.
+ *
+ * The second argument (DateTimeZone::ALL) means "include every
+ * zone, not just the ones with a country code."
+ */
+function allTimezones(): array
+{
+    // static keeps the value between calls within one request.
+    static $list = null;
+
+    if ($list === null) {
+        $list = DateTimeZone::listIdentifiers(DateTimeZone::ALL);
+    }
+
+    return $list;
+}
+
+/**
+ * Extract a "friendly" city name from a timezone identifier.
+ * Example: 'America/New_York' -> 'New York'.
+ * We use this as the default label when the user picks a new zone.
+ */
+function cityFromTimezone(string $timezone): string
+{
+    // Split on '/', take the last chunk, replace underscores with spaces.
+    $parts = explode('/', $timezone);
+    $last  = end($parts);
+    return str_replace('_', ' ', $last);
 }

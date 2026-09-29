@@ -17,9 +17,7 @@ const DATA_FILE = __DIR__ . '/data/clock.json';
 function defaultData(): array
 {
     return [
-        // NEW: app-wide settings live here.
         'settings' => [
-            // '24' or '12' — controls how clocks are formatted.
             'timeFormat' => '24',
         ],
         'timezones' => [
@@ -29,7 +27,12 @@ function defaultData(): array
             ['name' => 'Doha',    'timezone' => 'Asia/Qatar'],
         ],
         'alarms' => [
-            // ... unchanged ...
+            ['id' => 1, 'name' => 'Wake up',      'time' => '07:00', 'timezone' => 'Asia/Riyadh',         'enabled' => true],
+            ['id' => 2, 'name' => 'Standup call', 'time' => '09:30', 'timezone' => 'Asia/Qatar',          'enabled' => true],
+            ['id' => 3, 'name' => 'Lunch',        'time' => '12:00', 'timezone' => 'Asia/Riyadh',         'enabled' => true],
+            ['id' => 4, 'name' => 'Call Apple',   'time' => '18:00', 'timezone' => 'America/Los_Angeles', 'enabled' => true],
+            ['id' => 5, 'name' => 'Call Riz',     'time' => '19:00', 'timezone' => 'Asia/Riyadh',         'enabled' => true],
+            ['id' => 6, 'name' => 'Dinner',       'time' => '21:00', 'timezone' => 'Asia/Qatar',          'enabled' => false],
         ],
     ];
 }
@@ -40,26 +43,25 @@ function defaultData(): array
  */
 function loadData(): array
 {
-    // file_exists returns true if the file is on disk.
     if (!file_exists(DATA_FILE)) {
         $defaults = defaultData();
-        saveData($defaults);          // create the file
+        saveData($defaults);
         return $defaults;
     }
 
-    // file_get_contents reads the entire file into a string.
     $json = file_get_contents(DATA_FILE);
-
-    // json_decode turns JSON text back into a PHP array.
-    // The `true` argument means "return an associative array"
-    // instead of stdClass objects.
     $data = json_decode($json, true);
 
-    // If decoding failed (bad JSON), fall back to defaults.
     if (!is_array($data)) {
         $defaults = defaultData();
         saveData($defaults);
         return $defaults;
+    }
+
+    // Backfill: older data files may lack 'settings'.
+    if (!isset($data['settings'])) {
+        $data['settings'] = ['timeFormat' => '24'];
+        saveData($data);
     }
 
     return $data;
@@ -67,8 +69,6 @@ function loadData(): array
 
 /**
  * Save data to disk as pretty-printed JSON.
- * JSON_PRETTY_PRINT makes the file human-readable, which is
- * great while learning — you can open it and see what changed.
  */
 function saveData(array $data): void
 {
@@ -78,7 +78,6 @@ function saveData(array $data): void
 
 /**
  * Find the next available alarm id (max + 1).
- * We need this when the user adds a new alarm.
  */
 function nextAlarmId(array $alarms): int
 {

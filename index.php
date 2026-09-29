@@ -12,26 +12,20 @@ require_once 'helpers.php';
 $data      = loadData();
 $timezones = $data['timezones'];
 $alarms    = $data['alarms'];
-$timeFormat = $data['settings']['timeFormat'] ?? '24';
 
 // ----------------------------------------------------------------
 // HANDLE THE 12/24 TOGGLE
 // ----------------------------------------------------------------
-// The toggle is a tiny form that POSTs back to index.php.
-// We flip the setting and save it.
-// ----------------------------------------------------------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'toggle_format') {
-
-    // Read current value, flip it, and write it back.
     $current = $data['settings']['timeFormat'] ?? '24';
     $data['settings']['timeFormat'] = $current === '24' ? '12' : '24';
-
-    // Save to disk.
     saveData($data);
 }
 
-// The MAIN clock is the FIRST timezone — currently Jeddah.
-// Its mood drives the whole page's theme.
+// Which format does the user prefer?
+$timeFormat = $data['settings']['timeFormat'] ?? '24';
+
+// The MAIN clock is the FIRST timezone.
 $primaryTz   = $timezones[0]['timezone'];
 $primaryHour = hourInZone($primaryTz);
 $mood        = moodForHour($primaryHour);
@@ -45,24 +39,20 @@ $ringingAlarms = findRingingAlarms($alarms);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>World Clock — Jeddah Main</title>
-    <link rel="stylesheet" href="style.css?v=2">
+    <link rel="stylesheet" href="style.css?v=3">
 </head>
 <body class="mood-<?= e($mood) ?>">
 
     <header class="site-header">
-
-        <!-- Centered title block -->
         <div class="header-main">
             <h1>🕰 World Clock</h1>
             <p class="subtitle">
                 Main: <strong><?= e($timezones[0]['name']) ?></strong>
-                — mood: <strong><?= e($mood) ?></strong>
+                — Mood: <strong><?= e($mood) ?></strong>
             </p>
         </div>
 
-        <!-- Settings link pinned to the far right -->
         <div class="header-action">
-            <!-- Toggle 12/24. The label shows what you'll switch TO. -->
             <form method="post" class="inline">
                 <input type="hidden" name="action" value="toggle_format">
                 <button type="submit" class="btn btn-icon"
@@ -74,7 +64,6 @@ $ringingAlarms = findRingingAlarms($alarms);
 
             <a class="btn btn-icon" href="settings.php" title="Settings" aria-label="Settings">⚙</a>
         </div>
-
     </header>
 
     <?php if (!empty($ringingAlarms)): ?>
@@ -93,8 +82,12 @@ $ringingAlarms = findRingingAlarms($alarms);
             <?php
                 $tzHour = hourInZone($tz['timezone']);
                 $tzMood = moodForHour($tzHour);
-                $clockDate = new DateTime('now', new DateTimeZone($tz['timezone']));
-                $tzTime = $clockDate->format($timeFormat === '24' ? 'H:i:s' : 'g:i:s A');
+                $tzTime = formatTime(
+                    $tz['timezone'],
+                    'H:i:s',
+                    'g:i:s A',
+                    $timeFormat
+                );
             ?>
             <div class="tz-card mood-<?= e($tzMood) ?><?= $i === 0 ? ' main' : '' ?>"
                  data-timezone="<?= e($tz['timezone']) ?>">
@@ -123,32 +116,39 @@ $ringingAlarms = findRingingAlarms($alarms);
         </ul>
     </section>
 
-    <!-- The same live-tick JS as before. -->
     <script>
-    const clockElements = document.querySelectorAll('[data-clock]');
-    function timeInZone(timezone) {
-    // Ask the user's format preference: '12' or '24'.
-        const use12 = TIME_FORMAT === '12';
+    // PHP injects the user's 12/24 preference so JS can honor it.
+    const TIME_FORMAT = <?= json_encode($timeFormat) ?>;
 
-        return new Intl.DateTimeFormat('en-US', {
+    const clockElements = document.querySelectorAll('[data-clock]');
+
+    // Format the current time for a timezone, respecting 12/24 choice.
+    function timeInZone(timezone) {
+        const use12 = TIME_FORMAT === '12';
+        const locale = use12 ? 'en-US' : 'en-GB';
+
+        return new Intl.DateTimeFormat(locale, {
             timeZone: timezone,
-            hour:   use12 ? 'numeric' : '2-digit',  // '2' vs '02'
-            minute: '2-digit',
-            second: '2-digit',
-            hour12: use12,                           // flip per preference
+            hour:     use12 ? 'numeric' : '2-digit',
+            minute:   '2-digit',
+            second:   '2-digit',
+            hour12:   use12,
         }).format(new Date());
     }
+
     function tick() {
         clockElements.forEach(function (el) {
             const now = timeInZone(el.getAttribute('data-timezone'));
-            if (el.textContent !== now) el.textContent = now;
+            if (el.textContent !== now) {
+                el.textContent = now;
+            }
         });
     }
+
     tick();
     setInterval(tick, 1000);
     </script>
 
-    <!-- Required footer -->
     <footer class="site-footer">
         <p>Another app by Dr. Earnest Ujaama for appsbyeu</p>
     </footer>

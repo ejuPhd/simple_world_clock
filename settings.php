@@ -2,8 +2,8 @@
 declare(strict_types=1);
 
 // settings.php
-// Lets the user edit everything: reorder clocks, rename them,
-// add/edit/delete alarms. All changes are saved to the JSON file.
+// Lets the user edit everything: reorder clocks, rename or REPLACE
+// them with different timezones, and add/edit/delete alarms.
 
 require_once 'config.php';
 require_once 'helpers.php';
@@ -19,35 +19,29 @@ $notice = '';
 // ----------------------------------------------------------------
 // HANDLE FORM SUBMISSIONS
 // ----------------------------------------------------------------
-// $_SERVER['REQUEST_METHOD'] tells us GET vs POST.
-// We only act when the form is submitted via POST.
-// ----------------------------------------------------------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-    // Read the "action" field so we know which form was submitted.
-    // ?? '' protects against a missing key.
+    // Which form was submitted?
     $action = $_POST['action'] ?? '';
 
     // ------------------------------------------------------------
-    // MOVE A TIMEZONE UP OR DOWN (reordering)
+    // MOVE A TIMEZONE UP OR DOWN
     // ------------------------------------------------------------
     if ($action === 'move_timezone') {
         $index  = (int) ($_POST['index'] ?? -1);
         $dir    = $_POST['direction'] ?? '';
         $target = $dir === 'up' ? $index - 1 : $index + 1;
 
-        // Only swap if both indices are within bounds.
         if ($index >= 0 && $target >= 0 && $target < count($timezones)) {
-            // Swap via a temp variable.
-            $tmp                  = $timezones[$index];
-            $timezones[$index]    = $timezones[$target];
-            $timezones[$target]   = $tmp;
+            $tmp                = $timezones[$index];
+            $timezones[$index]  = $timezones[$target];
+            $timezones[$target] = $tmp;
             $notice = 'Clock order updated.';
         }
     }
 
     // ------------------------------------------------------------
-    // EDIT A TIMEZONE (rename or change its identifier)
+    // EDIT A TIMEZONE (rename or change identifier)
     // ------------------------------------------------------------
     if ($action === 'edit_timezone') {
         $index = (int) ($_POST['index'] ?? -1);
@@ -55,13 +49,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $tzId  = trim($_POST['timezone'] ?? '');
 
         if ($index >= 0 && $index < count($timezones) && $name !== '' && $tzId !== '') {
-            // Validate the timezone identifier: PHP will throw if
-            // it isn't recognized. We catch that and reject it.
             try {
                 new DateTimeZone($tzId);
                 $timezones[$index]['name']     = $name;
                 $timezones[$index]['timezone'] = $tzId;
                 $notice = 'Clock updated.';
+            } catch (Exception $ex) {
+                $notice = 'Invalid timezone: ' . $tzId;
+            }
+        }
+    }
+
+    // ------------------------------------------------------------
+    // REPLACE A TIMEZONE
+    // ------------------------------------------------------------
+    // This is the NEW action. It takes an existing slot (by index)
+    // and swaps in a completely different timezone. The slot keeps
+    // its position in the order.
+    //
+    // We accept:
+    //   - index     : which slot to replace
+    //   - timezone  : the new identifier (required, must be valid)
+    //   - name      : optional label. If blank, we auto-derive
+    //                 the city name from the identifier.
+    // ------------------------------------------------------------
+    if ($action === 'replace_timezone') {
+        $index = (int) ($_POST['index'] ?? -1);
+        $tzId  = trim($_POST['replace_timezone'] ?? '');
+        $name  = trim($_POST['replace_name'] ?? '');
+
+        // Basic presence checks.
+        if ($index < 0 || $index >= count($timezones)) {
+            $notice = 'Invalid clock slot.';
+        } elseif ($tzId === '') {
+            $notice = 'Please pick a timezone to replace it with.';
+        } else {
+            try {
+                // Throws if the identifier isn't a real timezone.
+                new DateTimeZone($tzId);
+
+                // If the user didn't type a name, derive one from
+                // the identifier — 'Europe/Paris' becomes 'Paris'.
+                if ($name === '') {
+                    $name = cityFromTimezone($tzId);
+                }
+
+                // Overwrite the slot's name and timezone, but keep
+                // its position in the array untouched.
+                $timezones[$index]['name']     = $name;
+                $timezones[$index]['timezone'] = $tzId;
+
+                $notice = 'Replaced slot ' . ($index + 1) . ' with ' . $name . '.';
             } catch (Exception $ex) {
                 $notice = 'Invalid timezone: ' . $tzId;
             }
@@ -76,7 +114,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $time = trim($_POST['time']     ?? '');
         $tz   = trim($_POST['timezone'] ?? '');
 
-        // Validate: name non-empty, time matches HH:MM.
         if ($name === '' || !isValidTime($time) || $tz === '') {
             $notice = 'Please fill name, a valid HH:MM time, and a timezone.';
         } else {
@@ -103,7 +140,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($name === '' || !isValidTime($time) || $tz === '') {
             $notice = 'Please fill name, a valid HH:MM time, and a timezone.';
         } else {
-            // Find the alarm by id and update it in place.
             foreach ($alarms as $i => $a) {
                 if ((int) $a['id'] === $id) {
                     $alarms[$i]['name']     = $name;
@@ -123,7 +159,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $id = (int) ($_POST['id'] ?? 0);
         foreach ($alarms as $i => $a) {
             if ((int) $a['id'] === $id) {
-                // The ! flips true→false and false→true.
                 $alarms[$i]['enabled'] = !$a['enabled'];
                 break;
             }
@@ -137,9 +172,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'delete_alarm') {
         $id = (int) ($_POST['id'] ?? 0);
 
-        // array_filter returns a new array containing only entries
-        // where the callback returns true. We use it to remove the
-        // matching alarm.
         $alarms = array_values(array_filter(
             $alarms,
             fn($a) => (int) $a['id'] !== $id
@@ -148,16 +180,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // ------------------------------------------------------------
-    // PERSIST THE CHANGES
+    // PERSIST
     // ------------------------------------------------------------
-    // Whatever we changed, write the whole thing back to disk.
-    saveData(['timezones' => $timezones, 'alarms' => $alarms]);
+    saveData(['settings' => $data['settings'], 'timezones' => $timezones, 'alarms' => $alarms]);
 
-    // Reload so the form below reflects the change immediately.
+    // Reload so the form reflects the change immediately.
     $data      = loadData();
     $timezones = $data['timezones'];
     $alarms    = $data['alarms'];
 }
+
+// Fetch the full list of valid timezones ONCE for the replace dropdowns.
+// We only need this on this page, so we grab it here.
+$tzList = allTimezones();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -165,13 +200,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Settings — World Clock</title>
-    <link rel="stylesheet" href="style.css?v=2">
+    <link rel="stylesheet" href="style.css?v=3">
 </head>
 <body class="mood-day">
 
-   <header class="site-header">
-
-        <!-- Centered title block -->
+    <header class="site-header">
         <div class="header-main">
             <h1>⚙ Settings</h1>
             <?php if ($notice !== ''): ?>
@@ -179,70 +212,89 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <?php endif; ?>
         </div>
 
-        <!-- Back link pinned to the far right -->
         <div class="header-action">
             <a class="btn btn-icon" href="index.php" title="Back to clock" aria-label="Back">←</a>
         </div>
-
     </header>
 
     <!-- ======================================================
-         SECTION 1 — REORDER / EDIT CLOCKS
+         CLOCKS — reorder, edit, replace
          ====================================================== -->
     <section class="settings-section">
-        <h2>Clocks (order matters — the first one is the main clock)</h2>
+        <h2>Clocks</h2>
+        <p class="section-hint">
+            The first clock is the main clock — its time of day drives the page theme.
+            Use ↑ ↓ to reorder. Use <strong>Edit</strong> to rename in place.
+            Use <strong>Replace</strong> to swap in a different city entirely.
+        </p>
 
-        <table class="settings-table">
-            <thead>
-                <tr>
-                    <th>#</th>
-                    <th>Name</th>
-                    <th>Timezone</th>
-                    <th>Order</th>
-                    <th>Edit</th>
-                </tr>
-            </thead>
-            <tbody>
-            <?php foreach ($timezones as $i => $tz): ?>
-                <tr>
-                    <td><?= $i + 1 ?></td>
-                    <td><?= e($tz['name']) ?></td>
-                    <td><code><?= e($tz['timezone']) ?></code></td>
-                    <td>
-                        <!-- Move up: disabled on the first row -->
-                        <form method="post" class="inline">
-                            <input type="hidden" name="action"    value="move_timezone">
-                            <input type="hidden" name="index"     value="<?= $i ?>">
-                            <input type="hidden" name="direction" value="up">
-                            <button <?= $i === 0 ? 'disabled' : '' ?>>↑</button>
-                        </form>
+        <?php foreach ($timezones as $i => $tz): ?>
+            <div class="tz-editor">
 
-                        <!-- Move down: disabled on the last row -->
-                        <form method="post" class="inline">
-                            <input type="hidden" name="action"    value="move_timezone">
-                            <input type="hidden" name="index"     value="<?= $i ?>">
-                            <input type="hidden" name="direction" value="down">
-                            <button <?= $i === count($timezones) - 1 ? 'disabled' : '' ?>>↓</button>
-                        </form>
-                    </td>
-                    <td>
-                        <!-- Edit form: posts name + timezone for this row -->
-                        <form method="post" class="inline edit-form">
-                            <input type="hidden" name="action" value="edit_timezone">
-                            <input type="hidden" name="index"  value="<?= $i ?>">
-                            <input type="text"   name="name"     value="<?= e($tz['name']) ?>"     placeholder="Name">
-                            <input type="text"   name="timezone" value="<?= e($tz['timezone']) ?>" placeholder="Area/City">
-                            <button>Save</button>
-                        </form>
-                    </td>
-                </tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table>
+                <!-- Row 1: current values, order controls, edit form -->
+                <div class="tz-row-main">
+                    <span class="tz-position"><?= $i + 1 ?></span>
+
+                    <div class="tz-current">
+                        <strong><?= e($tz['name']) ?></strong>
+                        <code><?= e($tz['timezone']) ?></code>
+                    </div>
+
+                    <!-- Move up / down -->
+                    <form method="post" class="inline">
+                        <input type="hidden" name="action"    value="move_timezone">
+                        <input type="hidden" name="index"     value="<?= $i ?>">
+                        <input type="hidden" name="direction" value="up">
+                        <button <?= $i === 0 ? 'disabled' : '' ?> title="Move up">↑</button>
+                    </form>
+                    <form method="post" class="inline">
+                        <input type="hidden" name="action"    value="move_timezone">
+                        <input type="hidden" name="index"     value="<?= $i ?>">
+                        <input type="hidden" name="direction" value="down">
+                        <button <?= $i === count($timezones) - 1 ? 'disabled' : '' ?> title="Move down">↓</button>
+                    </form>
+                </div>
+
+                <!-- Row 2: Edit (rename this slot) -->
+                <form method="post" class="tz-row-form">
+                    <input type="hidden" name="action" value="edit_timezone">
+                    <input type="hidden" name="index"  value="<?= $i ?>">
+
+                    <label>Rename:</label>
+                    <input type="text" name="name" value="<?= e($tz['name']) ?>" placeholder="Name">
+                    <input type="text" name="timezone" value="<?= e($tz['timezone']) ?>" placeholder="Area/City">
+                    <button>Save</button>
+                </form>
+
+                <!-- Row 3: Replace (swap slot for a different timezone) -->
+                <form method="post" class="tz-row-form">
+                    <input type="hidden" name="action" value="replace_timezone">
+                    <input type="hidden" name="index"  value="<?= $i ?>">
+
+                    <label>Replace with:</label>
+                    <!-- The dropdown lists every valid PHP timezone.
+                         We group by region for readability. -->
+                    <select name="replace_timezone" required>
+                        <option value="">— pick a timezone —</option>
+                        <?php foreach ($tzList as $option): ?>
+                            <option value="<?= e($option) ?>"
+                                <?= $option === $tz['timezone'] ? 'disabled' : '' ?>>
+                                <?= e($option) ?>
+                                <?= $option === $tz['timezone'] ? ' (current)' : '' ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+
+                    <label>Label (optional):</label>
+                    <input type="text" name="replace_name" placeholder="Leave blank to auto-name">
+                    <button>Replace</button>
+                </form>
+            </div>
+        <?php endforeach; ?>
     </section>
 
     <!-- ======================================================
-         SECTION 2 — ADD ALARM
+         ADD ALARM
          ====================================================== -->
     <section class="settings-section">
         <h2>Add Alarm</h2>
@@ -262,7 +314,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </section>
 
     <!-- ======================================================
-         SECTION 3 — EDIT / TOGGLE / DELETE ALARMS
+         EDIT / TOGGLE / DELETE ALARMS
          ====================================================== -->
     <section class="settings-section">
         <h2>Alarms</h2>
@@ -283,7 +335,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <tbody>
                 <?php foreach ($alarms as $alarm): ?>
                     <tr class="<?= $alarm['enabled'] ? '' : 'disabled-row' ?>">
-                        <!-- Edit-in-place form spans the first 3 cells -->
                         <td>
                             <form method="post" id="upd-<?= (int) $alarm['id'] ?>" class="row-form">
                                 <input type="hidden" name="action" value="update_alarm">
@@ -303,13 +354,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     <?php endforeach; ?>
                                 </select>
                         </td>
-                        <td>
-                                <?= $alarm['enabled'] ? 'ON' : 'off' ?>
-                        </td>
+                        <td><?= $alarm['enabled'] ? 'ON' : 'off' ?></td>
                         <td class="actions">
                                 <button form="upd-<?= (int) $alarm['id'] ?>">Save</button>
                             </form>
-                            <!-- Separate small forms for toggle/delete -->
                             <form method="post" class="inline">
                                 <input type="hidden" name="action" value="toggle_alarm">
                                 <input type="hidden" name="id" value="<?= (int) $alarm['id'] ?>">

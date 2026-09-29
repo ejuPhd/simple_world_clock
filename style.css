@@ -399,3 +399,33 @@ select {
     font-size: 0.8rem;
     opacity: 0.7;
 }
+
+/* ================================================================
+   TIMEZONE EDITOR (settings.php)
+   ================================================================ */
+
+.section-hint {
+    font-size: 0.85rem;
+    opacity: 0.75;
+    margin-bottom: 1rem;
+    line-height: 1.4;
+}
+
+/* Each clock slot is a bordered group of three rows. */
+.tz-editor {
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.75rem;
+    background: rgba(0, 0, 0, 0.08);
+}
+
+/* Row 1 — position number, current values, move buttons */
+.tz-row-main {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.12);
+    margin-bottom: 0.6rem;
+}
